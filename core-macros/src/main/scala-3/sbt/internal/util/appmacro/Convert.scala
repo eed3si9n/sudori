@@ -3,6 +3,15 @@ package sbt.internal.util.appmacro
 import sbt.internal.util.Types
 import scala.quoted.*
 
+/**
+ * Convert is a glorified partial function to scan through the AST
+ * for the purpose of substituting the matching term with something else.
+ * 
+ * This is driven by calling transformWrappers(...) method. The filtering
+ * is limited to the shape of code matched using `appTransformer`,
+ * which is a generic function with a single type param and a single term param
+ * like `X.wrapInit[A](...)`.
+ */
 trait Convert[C <: Quotes & Singleton](override val qctx: C) extends ContextUtil[C]:
   import qctx.reflect.*
 
