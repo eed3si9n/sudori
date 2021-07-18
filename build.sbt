@@ -1,0 +1,13 @@
+import Dependencies._
+
+ThisBuild / scalaVersion := "3.0.0"
+
+lazy val coreMacrosProj = (project in file("core-macros"))
+  .settings(nocomma {
+    name := "Core Macros"
+    libraryDependencies ++= Seq(
+      collectionsProj.cross(CrossVersion.for3Use2_13),
+      verify % Test,
+    )
+    testFrameworks += new TestFramework("verify.runner.Framework")
+  })
