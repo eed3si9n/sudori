@@ -1,6 +1,6 @@
 import Dependencies._
 
-ThisBuild / scalaVersion := "3.0.0"
+ThisBuild / scalaVersion := "3.0.1"
 
 lazy val coreMacrosProj = (project in file("core-macros"))
   .settings(nocomma {
