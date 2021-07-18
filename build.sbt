@@ -1,5 +1,6 @@
 import Dependencies._
 
+ThisBuild / semanticdbEnabled := true
 ThisBuild / scalaVersion := "3.0.1"
 
 lazy val coreMacrosProj = (project in file("core-macros"))

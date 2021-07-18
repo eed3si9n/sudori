@@ -17,7 +17,7 @@ object ConvertTestMacro:
       tpe match
         case '[a] =>
           '{
-            Option[a](${selection.asExprOf[a]})
+            Option[a](${ selection.asExprOf[a] })
           }.asTerm
     def substitute(name: String, tpe: Type[_], qual: Term, replace: Term) =
       convert1.convert[Boolean](name, qual) transform { (tree: Term) =>
@@ -26,7 +26,8 @@ object ConvertTestMacro:
     convert1.transformWrappers(expr.asTerm, substitute).asExprOf[Boolean]
 
   class InputInitConvert[C <: Quotes & Singleton](override val qctx: C)
-      extends Convert[C](qctx) with ContextUtil[C](qctx):
+      extends Convert[C](qctx)
+      with ContextUtil[C](qctx):
     import qctx.reflect.*
     def convert[A: Type](nme: String, in: Term): Converted =
       nme match
