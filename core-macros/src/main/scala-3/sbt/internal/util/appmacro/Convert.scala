@@ -3,7 +3,7 @@ package sbt.internal.util.appmacro
 import sbt.internal.util.Types
 import scala.quoted.*
 
-trait Convert(val qctx: Quotes):
+trait Convert[C <: Quotes & Singleton](override val qctx: C) extends ContextUtil[C]:
   import qctx.reflect.*
 
   def convert[A: Type](nme: String, in: Term): Converted

@@ -10,8 +10,8 @@ object ConvertTestMacro:
   inline def someMacro(inline expr: Boolean): Boolean =
     ${ someMacroImpl('expr) }
 
-  def someMacroImpl(expr: Expr[Boolean])(using qctx0: Quotes) =
-    val convert1: Convert = new InputInitConvert(qctx0)
+  def someMacroImpl(expr: Expr[Boolean])(using qctx: Quotes) =
+    val convert1: Convert[qctx.type] = new InputInitConvert(qctx)
     import convert1.qctx.reflect.*
     def addTypeCon(tpe: Type[_], qual: Term, selection: Term): Term =
       tpe match
@@ -25,7 +25,8 @@ object ConvertTestMacro:
       }
     convert1.transformWrappers(expr.asTerm, substitute).asExprOf[Boolean]
 
-  class InputInitConvert(override val qctx: Quotes) extends Convert(qctx):
+  class InputInitConvert[C <: Quotes & Singleton](override val qctx: C)
+      extends Convert[C](qctx) with ContextUtil[C](qctx):
     import qctx.reflect.*
     def convert[A: Type](nme: String, in: Term): Converted =
       nme match
