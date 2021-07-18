@@ -3,54 +3,60 @@ package sbt.internal.util.appmacro
 import sbt.internal.util.Types
 import scala.quoted.*
 
-abstract class Convert:
-  def convert[A: Type](using qctx: Quotes)(nme: String, in: qctx.reflect.Term): Converted[qctx.type]
+trait Convert(val qctx: Quotes):
+  import qctx.reflect.*
 
-  def asPredicate[A](using qctx: Quotes): (String, Type[A], qctx.reflect.Term) => Boolean =
+  def convert[A: Type](nme: String, in: Term): Converted
+
+  def asPredicate[A]: (String, Type[A], Term) => Boolean =
     (n, tpe, tree) =>
       val tag = tpe
       convert(n, tree)(tag).isSuccess
+
+  /**
+   * Substitutes wrappers in tree `t` with the result of `subWrapper`.
+   * A wrapper is a Tree of the form `f[T](v)` for which isWrapper(<Tree of f>, <Underlying Type>, <qual>.target) returns true.
+   * Typically, `f` is a `Select` or `Ident`.
+   * The wrapper is replaced with the result of `subWrapper(<Type of T>, <Tree of v>, <wrapper Tree>)`
+   */
+  def transformWrappers(
+    tree: Term,
+    subWrapper: (String, Type[_], Term, Term) => Converted
+  ): Term =
+    // the main tree transformer that replaces calls to InputWrapper.wrap(x) with
+    //  plain Idents that reference the actual input value
+    object appTransformer extends TreeMap:
+      override def transformTerm(tree: Term)(owner: Symbol): Term =
+        tree match
+          case Apply(TypeApply(Select(_, nme), targ :: Nil), qual :: Nil) =>
+            subWrapper(nme, targ.tpe.asType, qual, tree) match
+              case Converted.Success(tree, finalTransform) =>
+                finalTransform(tree)
+              case Converted.Failure(position, message) =>
+                report.error(message, position)
+                sys.error("macro error: " + message)
+              case _ =>
+                super.transformTerm(tree)(owner)
+          case _ =>
+            super.transformTerm(tree)(owner)
+    end appTransformer
+    appTransformer.transformTerm(tree)(Symbol.spliceOwner)
+
+  object Converted:
+    def success(tree: Term) = Converted.Success(tree, Types.idFun)
+
+  enum Converted:
+    def isSuccess: Boolean = this match
+      case Success(_, _) => true
+      case _             => false
+
+    def transform(f: Term => Term): Converted = this match
+      case Success(tree, finalTransform) => Success(f(tree), finalTransform)
+      case x: Failure       => x
+      case x: NotApplicable => x
+
+    case Success(tree: Term, finalTransform: Term => Term) extends Converted
+    case Failure(position: Position, message: String) extends Converted
+    case NotApplicable() extends Converted
+  end Converted
 end Convert
-
-object Converted:  
-  def success[C <: Quotes](using qctx: C)(
-      tree: qctx.reflect.Term,
-      finalTransform: qctx.reflect.Term => qctx.reflect.Term): Success[C] =
-    Success(qctx)(tree, finalTransform)
-
-  def success[C <: Quotes](using qctx: C)(tree: qctx.reflect.Term): Success[C] =
-    success[C](tree, Types.idFun)
-
-  def failure[C <: Quotes](using qctx: C)(
-    position: qctx.reflect.Position,
-    message: String): Failure[C] =
-    Failure(qctx)(position, message)
-
-  def notApplicable[C <: Quotes](using qctx: C): NotApplicable[C] =
-    NotApplicable(qctx)
-
-enum Converted[C <: Quotes](val qctx: C):
-  def isSuccess: Boolean = this match
-    case _: Success[C] => true
-    case _             => false
-
-  def transform(f: qctx.reflect.Term => qctx.reflect.Term): Converted[C] = this match
-    case x: Failure[C]       => Failure(x.qctx)(x.position, x.message)
-    case x: Success[C] if x.qctx == qctx =>
-      Success(x.qctx)(
-        f(x.tree.asInstanceOf[qctx.reflect.Term]).asInstanceOf[x.qctx.reflect.Term],
-        x.finalTransform)
-    case x: NotApplicable[C] => x
-    case x                   => sys.error(s"Unknown case $x")
-
-  case Success(override val qctx: C)(
-      val tree: qctx.reflect.Term,
-      val finalTransform: qctx.reflect.Term => qctx.reflect.Term) extends Converted[C](qctx)
-
-  case Failure(override val qctx: C)(
-      val position: qctx.reflect.Position,
-      val message: String)
-    extends Converted[C](qctx)
-
-  case NotApplicable(override val qctx: C) extends Converted[C](qctx)
-end Converted

@@ -10,31 +10,28 @@ object ConvertTestMacro:
   inline def someMacro(inline expr: Boolean): Boolean =
     ${ someMacroImpl('expr) }
 
-  def someMacroImpl(expr: Expr[Boolean])(using qctx: Quotes) =
-    import quotes.reflect.*
-    val convert1 = InputInitConvert
-    val util = new ContextUtil[qctx.type]()
-
+  def someMacroImpl(expr: Expr[Boolean])(using qctx0: Quotes) =
+    val convert1: Convert = new InputInitConvert(qctx0)
+    import convert1.qctx.reflect.*
     def addTypeCon(tpe: Type[_], qual: Term, selection: Term): Term =
       tpe match
         case '[a] =>
           '{
-            Option(${selection.asExprOf[a]})
+            Option[a](${selection.asExprOf[a]})
           }.asTerm
-
-    def sub(name: String, tpe: Type[_], qual: Term, replace: Term) =
+    def substitute(name: String, tpe: Type[_], qual: Term, replace: Term) =
       convert1.convert[Boolean](name, qual) transform { (tree: Term) =>
         addTypeCon(tpe, tree, replace)
       }
-    val retval = util.transformWrappers(expr.asTerm, sub)
-    retval.asExprOf[Boolean]
+    convert1.transformWrappers(expr.asTerm, substitute).asExprOf[Boolean]
 
-  object InputInitConvert extends Convert:
-    def convert[A: Type](using qctx: Quotes)(nme: String, in: qctx.reflect.Term): Converted[qctx.type] =
+  class InputInitConvert(override val qctx: Quotes) extends Convert(qctx):
+    import qctx.reflect.*
+    def convert[A: Type](nme: String, in: Term): Converted =
       nme match
         case WrapInitName     => Converted.success(in)
-        case WrapInitTaskName => Converted.failure(in.pos, initTaskErrorMessage)
-        case _                => Converted.notApplicable
+        case WrapInitTaskName => Converted.Failure(in.pos, initTaskErrorMessage)
+        case _                => Converted.NotApplicable()
 
     private def initTaskErrorMessage = "Internal sbt error: initialize+task wrapper not split"
   end InputInitConvert
