@@ -10,5 +10,6 @@ lazy val coreMacrosProj = (project in file("core-macros"))
       collectionsProj.cross(CrossVersion.for3Use2_13),
       verify % Test,
     )
+    scalacOptions += "-Ykind-projector"
     testFrameworks += new TestFramework("verify.runner.Framework")
   })
