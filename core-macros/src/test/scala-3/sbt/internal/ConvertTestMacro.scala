@@ -25,7 +25,7 @@ object ConvertTestMacro:
       }
     convert1.transformWrappers(expr.asTerm, substitute).asExprOf[Boolean]
 
-  class InputInitConvert[C <: Quotes & Singleton](override val qctx: C)
+  class InputInitConvert[C <: Quotes & scala.Singleton](override val qctx: C)
       extends Convert[C](qctx)
       with ContextUtil[C](qctx):
     import qctx.reflect.*

@@ -7,9 +7,12 @@ import ContextUtilTestMacro.*
 object ContextUtilTest extends BasicTestSuite:
   test("extractTypeCon") {
     assert(
-      someMacro(
-        true
-      ) == "AppliedType(TypeRef(ThisType(TypeRef(NoPrefix,module class immutable)),class List),List(TypeParamRef(x)))"
+      extractTypeCon(true)
+        == "TypeRef(ThisType(TypeRef(NoPrefix,module class immutable)),class List)"
     )
+  }
+
+  test("extractInstance") {
+    assert(extractInstance(false) == "Ident(ListMonadInstance)")
   }
 end ContextUtilTest

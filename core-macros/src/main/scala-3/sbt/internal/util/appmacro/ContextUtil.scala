@@ -2,8 +2,9 @@ package sbt.internal.util.appmacro
 
 import sbt.internal.util.Types.Id
 import scala.quoted.*
+import scala.reflect.TypeTest
 
-trait ContextUtil[C <: Quotes & Singleton](val qctx: C):
+trait ContextUtil[C <: Quotes & scala.Singleton](val qctx: C):
   import qctx.reflect.*
   given qctx.type = qctx
 
@@ -19,8 +20,17 @@ trait ContextUtil[C <: Quotes & Singleton](val qctx: C):
     val fSym = tcpTpe.typeSymbol.declaredType(name).head
     val typeConTpe: TypeRepr = tcpTpe.memberType(fSym)
     val hiRepr = typeConTpe match
-      case TypeBounds(low, TypeLambda(_, _, repr)) => repr
+      case TypeBounds(low, TypeLambda(_, _, AppliedType(tc, _))) => tc
     hiRepr
+
+  /**
+   * Returns a reference given a singleton/termref
+   */
+  def extractInstance(itpe: TypeRepr): Ref =
+    def termRef(r: TypeRepr)(using rtt: TypeTest[TypeRepr, TermRef]): Ref = r match
+      case rtt(ref) => Ref.term(ref)
+      case _        => sys.error(s"expected termRef but got $itpe")
+    termRef(itpe)
 
   private var counter: Int = -1
   def freshName(prefix: String): String =
