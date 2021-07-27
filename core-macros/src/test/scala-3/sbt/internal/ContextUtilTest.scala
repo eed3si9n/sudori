@@ -15,4 +15,8 @@ object ContextUtilTest extends BasicTestSuite:
   test("extractInstance") {
     assert(extractInstance(false) == "Ident(ListMonadInstance)")
   }
+
+  test("makeLambda") {
+    assert(makeLambda(())(false) == "false")
+  }
 end ContextUtilTest
