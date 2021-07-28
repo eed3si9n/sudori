@@ -14,6 +14,9 @@ object ContextUtilTestMacro:
   inline def makeLambda(inline expr: Unit): Boolean => String =
     ${ makeLambdaImpl('expr) }
 
+  inline def makeLambda2(inline expr: Unit): Int => String =
+    ${ makeLambdaImpl2('expr) }
+
   def extractTypeConImpl(expr: Expr[Boolean])(using qctx: Quotes) =
     val util: ContextUtil[qctx.type] = new ContextUtil(qctx) {}
     val typeCon = util.extractTypeCon(Demo, "M")
@@ -40,6 +43,29 @@ object ContextUtilTestMacro:
         toStr.appliedToNone
       }
     ).asExprOf[Boolean => String]
+
+  def makeLambdaImpl2(expr: Expr[Unit])(using qctx: Quotes) =
+    import qctx.reflect.*
+    val ANON_FUN = "$anonfun"
+    val funSym = Symbol.newMethod(
+      parent = Symbol.spliceOwner,
+      name = ANON_FUN,
+      tpe = MethodType(List("x"))(_ => List(TypeRepr.of[Int]), _ => TypeRepr.of[String]),
+      flags = Flags.Synthetic,
+      privateWithin = Symbol.noSymbol,
+    )
+    val funDef = DefDef(
+      symbol = funSym,
+      rhsFn = (paramss: List[List[Tree]]) => {
+        val param = paramss.head.head
+        val toStr = Select.unique(Ref(param.symbol), "toString")
+        Option(toStr.appliedToNone)
+      }
+    )
+    Block(
+      List(funDef),
+      Closure(Ref(funSym), None)
+    ).asExprOf[Int => String]
 
   object Demo:
     type M[x] = List[x]

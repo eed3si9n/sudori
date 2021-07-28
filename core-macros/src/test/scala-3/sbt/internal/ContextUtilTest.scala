@@ -19,4 +19,8 @@ object ContextUtilTest extends BasicTestSuite:
   test("makeLambda") {
     assert(makeLambda(())(false) == "false")
   }
+
+  test("makeLambda2") {
+    assert(makeLambda2(())(2) == "2")
+  }
 end ContextUtilTest
