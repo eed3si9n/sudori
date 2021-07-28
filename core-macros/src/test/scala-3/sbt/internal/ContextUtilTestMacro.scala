@@ -8,8 +8,8 @@ object ContextUtilTestMacro:
   inline def extractTypeCon(inline expr: Boolean): String =
     ${ extractTypeConImpl('expr) }
 
-  inline def extractInstance(inline expr: Boolean): String =
-    ${ extractInstanceImpl('expr) }
+  inline def extractSingleton(inline expr: Boolean): String =
+    ${ extractSingletonImpl('expr) }
 
   inline def makeLambda(inline expr: Unit): Boolean => String =
     ${ makeLambdaImpl('expr) }
@@ -19,14 +19,14 @@ object ContextUtilTestMacro:
     val typeCon = util.extractTypeCon(Demo, "M")
     Expr(typeCon.toString)
 
-  def extractInstanceImpl(expr: Expr[Boolean])(using qctx: Quotes) =
+  def extractSingletonImpl(expr: Expr[Boolean])(using qctx: Quotes) =
     val util: ContextUtil[qctx.type] = new ContextUtil(qctx) {}
     import util.qctx.reflect.*
     def doExtract(
         i: MonadInstance & scala.Singleton
     )(using itpe: Type[i.type]): Expr[String] =
-      val r = util.extractInstance(TypeRepr.of[i.type])
-      Expr(r.toString)
+      val r = util.extractSingleton[i.type]
+      Expr(r.asTerm.toString)
     doExtract(ListMonadInstance)
 
   def makeLambdaImpl(expr: Expr[Unit])(using qctx: Quotes) =

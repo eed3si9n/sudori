@@ -26,11 +26,11 @@ trait ContextUtil[C <: Quotes & scala.Singleton](val qctx: C):
   /**
    * Returns a reference given a singleton/termref
    */
-  def extractInstance(itpe: TypeRepr): Ref =
+  def extractSingleton[A: Type]: Expr[A] =
     def termRef(r: TypeRepr)(using rtt: TypeTest[TypeRepr, TermRef]): Ref = r match
       case rtt(ref) => Ref.term(ref)
-      case _        => sys.error(s"expected termRef but got $itpe")
-    termRef(itpe)
+      case _        => sys.error(s"expected termRef but got $r")
+    termRef(TypeRepr.of[A]).asExprOf[A]
 
   private var counter: Int = -1
   def freshName(prefix: String): String =
