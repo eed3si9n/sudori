@@ -13,13 +13,13 @@ object ConvertTestMacro:
   def someMacroImpl(expr: Expr[Boolean])(using qctx: Quotes) =
     val convert1: Convert[qctx.type] = new InputInitConvert(qctx)
     import convert1.qctx.reflect.*
-    def addTypeCon(tpe: Type[_], qual: Term, selection: Term): Term =
-      tpe match
+    def addTypeCon(tpe: TypeRepr, qual: Term, selection: Term): Term =
+      tpe.asType match
         case '[a] =>
           '{
             Option[a](${ selection.asExprOf[a] })
           }.asTerm
-    def substitute(name: String, tpe: Type[_], qual: Term, replace: Term) =
+    def substitute(name: String, tpe: TypeRepr, qual: Term, replace: Term) =
       convert1.convert[Boolean](name, qual) transform { (tree: Term) =>
         addTypeCon(tpe, tree, replace)
       }

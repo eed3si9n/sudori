@@ -29,7 +29,7 @@ trait Convert[C <: Quotes & Singleton](override val qctx: C) extends ContextUtil
    */
   def transformWrappers(
       tree: Term,
-      subWrapper: (String, Type[_], Term, Term) => Converted
+      subWrapper: (String, TypeRepr, Term, Term) => Converted
   ): Term =
     // the main tree transformer that replaces calls to InputWrapper.wrap(x) with
     //  plain Idents that reference the actual input value
@@ -37,7 +37,7 @@ trait Convert[C <: Quotes & Singleton](override val qctx: C) extends ContextUtil
       override def transformTerm(tree: Term)(owner: Symbol): Term =
         tree match
           case Apply(TypeApply(Select(_, nme), targ :: Nil), qual :: Nil) =>
-            subWrapper(nme, targ.tpe.asType, qual, tree) match
+            subWrapper(nme, targ.tpe, qual, tree) match
               case Converted.Success(tree, finalTransform) =>
                 finalTransform(tree)
               case Converted.Failure(position, message) =>

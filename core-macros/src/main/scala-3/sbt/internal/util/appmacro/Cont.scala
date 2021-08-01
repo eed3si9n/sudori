@@ -14,7 +14,7 @@ import Classes.Applicative
 trait Cont:
   final val InstanceTCName = "F"
 
-  extension [C <: Quotes & Singleton](convert: Convert[C])
+  extension [C <: Quotes & Singleton](conv: Convert[C])
     /**
      * Implementation of a macro that provides a direct syntax for applicative functors. It is
      * intended to be used in conjunction with another macro that conditions the inputs.
@@ -23,7 +23,7 @@ trait Cont:
         i: MonadInstance with Singleton
     )(
         tree: Expr[A],
-        inner: convert.TermTransform[Effect]
+        inner: conv.TermTransform[Effect]
     )(using
         itpe: Type[i.type],
         iftpe: Type[i.F],
@@ -39,7 +39,7 @@ trait Cont:
         i: MonadInstance with Singleton
     )(
         tree: Expr[i.F[A]],
-        inner: convert.TermTransform[Effect]
+        inner: conv.TermTransform[Effect]
     )(using
         itpe: Type[i.type],
         iftpe: Type[i.F],
@@ -88,38 +88,38 @@ trait Cont:
         i: MonadInstance with Singleton
     )(
         eitherTree: Either[Expr[A], Expr[i.F[A]]],
-        inner: convert.TermTransform[Effect]
+        inner: conv.TermTransform[Effect]
     )(using
         itpe: Type[i.type],
         iftpe: Type[i.F],
         eatpe: Type[Effect[A]],
     ): Expr[i.F[Effect[A]]] =
-      import convert.qctx.reflect.*
-      given convert.qctx.type = convert.qctx
+      import conv.*
+      import qctx.reflect.*
+      given qctx.type = qctx
 
-      val fTypeCon = convert.extractTypeCon(i, InstanceTCName)
+      val fTypeCon = extractTypeCon(i, InstanceTCName)
       val faTpe = fTypeCon.appliedTo(TypeRepr.of[Effect[A]])
       val (expr, treeType) = eitherTree match
         case Left(l)  => (l, TypeRepr.of[Effect[A]])
         case Right(r) => (r, faTpe)
 
       // we can extract i out of i.type
-      val itpeRepr = TypeRepr.of[i.type]
-      val instance = convert.extractInstance(itpeRepr).asExprOf[i.type]
+      val instance = extractSingleton[i.type]
+      var inputs = List[Input]()
 
-      def makeApp(body: Term): Expr[i.F[Effect[A]]] =
-        pure(body)
-
-      // no inputs, so construct M[T] via Instance.pure or pure+flatten
-      def pure0[A1: Type](body: Expr[A1]): Expr[i.F[A1]] =
-        '{
-          $instance
-            .pure[A1] { () => $body }
-            .asInstanceOf[i.F[A1]]
-        }
+      def makeApp(body: Term): Expr[i.F[Effect[A]]] = inputs match
+        case Nil      => pure(body)
+        case x :: Nil => genMap(body, x)
 
       // no inputs, so construct F[A] via Instance.pure or pure+flatten
       def pure(body: Term): Expr[i.F[Effect[A]]] =
+        def pure0[A1: Type](body: Expr[A1]): Expr[i.F[A1]] =
+          '{
+            $instance
+              .pure[A1] { () => $body }
+              .asInstanceOf[i.F[A1]]
+          }
         eitherTree match
           case Left(_) => pure0[Effect[A]](body.asExprOf[Effect[A]])
           case Right(_) =>
@@ -136,22 +136,59 @@ trait Cont:
           }
         }
 
+      def genMap(body: Term, input: Input): Expr[i.F[Effect[A]]] =
+        def genMap0[A1: Type](body: Expr[A1], input: Input): Expr[i.F[A1]] =
+          input.tpe.asType match
+            case '[a] =>
+              val tpe = MethodType(List("$p0"))(_ => List(TypeRepr.of[a]), _ => TypeRepr.of[A1])
+              val lambda = Lambda(
+                owner = Symbol.spliceOwner,
+                tpe = tpe,
+                rhsFn = (sym, params) => {
+                  val param = params.head.asInstanceOf[Term]
+                  Block(
+                    // $q1 = $p0
+                    List(Assign(Ref(input.local.symbol), param)),
+                    body.asTerm
+                  )
+                }
+              ).asExprOf[a => A1]
+              val expr = input.expr.asExprOf[i.F[a]]
+              Typed(
+                Block(
+                  // this contains var $q1 = ...
+                  List(input.local),
+                  '{
+                    val _i = $instance
+                    _i
+                      .map[a, A1]($expr.asInstanceOf[_i.F[a]], $lambda)
+                  }.asTerm
+                ),
+                TypeTree.of[i.F[A1]]
+              ).asExprOf[i.F[A1]]
+        eitherTree match
+          case Left(_) =>
+            genMap0[Effect[A]](body.asExprOf[Effect[A]], input)
+          case Right(_) =>
+            flatten(genMap0[i.F[Effect[A]]](body.asExprOf[i.F[Effect[A]]], input))
+
       // Called when transforming the tree to add an input.
       //  For `qual` of type F[A], and a `selection` qual.value,
       //  the call is addType(Type A, Tree qual)
       // The result is a Tree representing a reference to
       //  the bound value of the input.
-      def addTypeCon(tpe: Type[_], qual: Term, selection: Term): Term =
-        tpe match
+      def subToProxy(tpe: TypeRepr, qual: Term, selection: Term): Term =
+        val vd = freshValDef(Symbol.spliceOwner, tpe)
+        inputs = Input(tpe, qual, vd) :: inputs
+        tpe.asType match
           case '[a] =>
-            '{
-              Option[a](${ selection.asExprOf[a] })
-            }.asTerm
-      def substitute(name: String, tpe: Type[_], qual: Term, replace: Term) =
-        convert.convert[A](name, qual) transform { (tree: Term) =>
-          addTypeCon(tpe, tree, replace)
+            Typed(Ref(vd.symbol), TypeTree.of[a])
+
+      def substitute(name: String, tpe: TypeRepr, qual: Term, replace: Term) =
+        convert[A](name, qual) transform { (tree: Term) =>
+          subToProxy(tpe, tree, replace)
         }
-      val tx = convert.transformWrappers(expr.asTerm, substitute)
+      val tx = transformWrappers(expr.asTerm, substitute)
       val tr = makeApp(inner(tx))
       tr
 end Cont

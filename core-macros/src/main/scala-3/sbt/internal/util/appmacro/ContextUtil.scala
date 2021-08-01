@@ -35,7 +35,24 @@ trait ContextUtil[C <: Quotes & scala.Singleton](val qctx: C):
   private var counter: Int = -1
   def freshName(prefix: String): String =
     counter = counter + 1
-    s"${prefix}_synth${counter}"
+    s"$$${prefix}${counter}"
+
+  /**
+   * Constructs a new, synthetic, local ValDef Type `A`, a unique name, an empty implementation (no
+   * rhs), and owned by `parent`.
+   */
+  def freshValDef(parent: Symbol, tpe: TypeRepr): ValDef =
+    tpe.asType match
+      case '[a] =>
+        val sym =
+          Symbol.newVal(parent, freshName("q"), tpe, Flags.Mutable, Symbol.noSymbol)
+        ValDef(sym, rhs = Option('{ 1 }.asTerm))
+
+  final class Input(
+      val tpe: TypeRepr,
+      val expr: Term,
+      val local: ValDef
+  )
 
   trait TermTransform[F[_]]:
     def apply(in: Term): Term

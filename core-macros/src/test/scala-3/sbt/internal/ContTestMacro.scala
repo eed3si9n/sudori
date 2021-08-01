@@ -7,10 +7,10 @@ import ConvertTestMacro.InputInitConvert
 import TestObjects.ListMonadInstance
 
 object ContTestMacro:
-  inline def someMacro[A](inline expr: A): List[A] =
-    ${ someMacroImpl('expr) }
+  inline def contMapNMacro[A](inline expr: A): List[A] =
+    ${ contMapNMacroImpl('expr) }
 
-  def someMacroImpl[A: Type](expr: Expr[A])(using qctx: Quotes) =
+  def contMapNMacroImpl[A: Type](expr: Expr[A])(using qctx: Quotes) =
     object ContSyntax extends Cont
     import ContSyntax.*
     val convert1: Convert[qctx.type] = new InputInitConvert(qctx)
