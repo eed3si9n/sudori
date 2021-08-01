@@ -10,7 +10,7 @@ object ContTest extends BasicTestSuite:
   }
 
   test("getMap") {
-    assert(contMapNMacro[Int](ContTest.wrapInit(List(1)) + 1).toString == "List(2)")
+    assert(contMapNMacro[Int](ContTest.wrapInit(List(1)) + 2).toString == "List(3)")
   }
 
   // This compiles away

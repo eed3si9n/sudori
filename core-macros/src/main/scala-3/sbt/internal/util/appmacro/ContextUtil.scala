@@ -1,6 +1,7 @@
 package sbt.internal.util.appmacro
 
 import sbt.internal.util.Types.Id
+import scala.compiletime.summonInline
 import scala.quoted.*
 import scala.reflect.TypeTest
 
@@ -38,15 +39,21 @@ trait ContextUtil[C <: Quotes & scala.Singleton](val qctx: C):
     s"$$${prefix}${counter}"
 
   /**
-   * Constructs a new, synthetic, local ValDef Type `A`, a unique name, an empty implementation (no
-   * rhs), and owned by `parent`.
+   * Constructs a new, synthetic, local var with type `tpe`, a unique name, initialized to
+   * zero-equivalent (Zero[A]), and owned by `parent`.
    */
   def freshValDef(parent: Symbol, tpe: TypeRepr): ValDef =
     tpe.asType match
       case '[a] =>
         val sym =
-          Symbol.newVal(parent, freshName("q"), tpe, Flags.Mutable, Symbol.noSymbol)
-        ValDef(sym, rhs = Option('{ 1 }.asTerm))
+          Symbol.newVal(
+            parent,
+            freshName("q"),
+            tpe,
+            Flags.Mutable | Flags.Synthetic,
+            Symbol.noSymbol
+          )
+        ValDef(sym, rhs = Option('{ summonInline[Zero[a]].zero }.asTerm))
 
   final class Input(
       val tpe: TypeRepr,
