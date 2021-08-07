@@ -154,19 +154,18 @@ trait Cont:
                   //  the bound value of the input.
                   def substitute(name: String, tpe: TypeRepr, qual: Term, replace: Term) =
                     convert[A](name, qual) transform { (tree: Term) =>
-                      Typed(Ref(param.symbol), TypeTree.of[a])
+                      typed[a](Ref(param.symbol))
                     }
                   transformWrappers(body.asTerm, substitute)
                 }
               ).asExprOf[a => A1]
               val expr = input.expr.asExprOf[i.F[a]]
-              Typed(
+              typed[i.F[A1]](
                 '{
                   val _i = $instance
                   _i
                     .map[a, A1]($expr.asInstanceOf[_i.F[a]], $lambda)
-                }.asTerm,
-                TypeTree.of[i.F[A1]]
+                }.asTerm
               ).asExprOf[i.F[A1]]
         eitherTree match
           case Left(_) =>

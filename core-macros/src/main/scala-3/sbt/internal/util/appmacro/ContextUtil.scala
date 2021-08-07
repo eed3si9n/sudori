@@ -55,6 +55,9 @@ trait ContextUtil[C <: Quotes & scala.Singleton](val qctx: C):
           )
         ValDef(sym, rhs = None)
 
+  def typed[A: Type](value: Term): Term =
+    Typed(value, TypeTree.of[A])
+
   final class Input(
       val tpe: TypeRepr,
       val expr: Term,
