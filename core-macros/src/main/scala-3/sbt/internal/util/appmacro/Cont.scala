@@ -140,30 +140,32 @@ trait Cont:
         def genMap0[A1: Type](body: Expr[A1], input: Input): Expr[i.F[A1]] =
           input.tpe.asType match
             case '[a] =>
-              val tpe = MethodType(List("$p0"))(_ => List(TypeRepr.of[a]), _ => TypeRepr.of[A1])
+              val tpe =
+                MethodType(List(input.name))(_ => List(TypeRepr.of[a]), _ => TypeRepr.of[A1])
               val lambda = Lambda(
                 owner = Symbol.spliceOwner,
                 tpe = tpe,
                 rhsFn = (sym, params) => {
                   val param = params.head.asInstanceOf[Term]
-                  Block(
-                    // $q1 = $p0
-                    List(Assign(Ref(input.local.symbol), param)),
-                    body.asTerm
-                  )
+                  // Called when transforming the tree to add an input.
+                  //  For `qual` of type F[A], and a `selection` qual.value,
+                  //  the call is addType(Type A, Tree qual)
+                  // The result is a Tree representing a reference to
+                  //  the bound value of the input.
+                  def substitute(name: String, tpe: TypeRepr, qual: Term, replace: Term) =
+                    convert[A](name, qual) transform { (tree: Term) =>
+                      Typed(Ref(param.symbol), TypeTree.of[a])
+                    }
+                  transformWrappers(body.asTerm, substitute)
                 }
               ).asExprOf[a => A1]
               val expr = input.expr.asExprOf[i.F[a]]
               Typed(
-                Block(
-                  // this contains var $q1 = ...
-                  List(input.local),
-                  '{
-                    val _i = $instance
-                    _i
-                      .map[a, A1]($expr.asInstanceOf[_i.F[a]], $lambda)
-                  }.asTerm
-                ),
+                '{
+                  val _i = $instance
+                  _i
+                    .map[a, A1]($expr.asInstanceOf[_i.F[a]], $lambda)
+                }.asTerm,
                 TypeTree.of[i.F[A1]]
               ).asExprOf[i.F[A1]]
         eitherTree match
@@ -173,22 +175,13 @@ trait Cont:
             flatten(genMap0[i.F[Effect[A]]](body.asExprOf[i.F[Effect[A]]], input))
 
       // Called when transforming the tree to add an input.
-      //  For `qual` of type F[A], and a `selection` qual.value,
-      //  the call is addType(Type A, Tree qual)
-      // The result is a Tree representing a reference to
-      //  the bound value of the input.
-      def subToProxy(tpe: TypeRepr, qual: Term, selection: Term): Term =
-        val vd = freshValDef(Symbol.spliceOwner, tpe)
-        inputs = Input(tpe, qual, vd) :: inputs
-        tpe.asType match
-          case '[a] =>
-            Typed(Ref(vd.symbol), TypeTree.of[a])
-
-      def substitute(name: String, tpe: TypeRepr, qual: Term, replace: Term) =
+      //  For `qual` of type F[A], and a `selection` qual.value.
+      def record(name: String, tpe: TypeRepr, qual: Term, replace: Term) =
         convert[A](name, qual) transform { (tree: Term) =>
-          subToProxy(tpe, tree, replace)
+          inputs = Input(tpe, qual, freshName("q")) :: inputs
+          replace
         }
-      val tx = transformWrappers(expr.asTerm, substitute)
+      val tx = transformWrappers(expr.asTerm, record)
       val tr = makeApp(inner(tx))
       tr
 end Cont

@@ -53,12 +53,12 @@ trait ContextUtil[C <: Quotes & scala.Singleton](val qctx: C):
             Flags.Mutable | Flags.Synthetic,
             Symbol.noSymbol
           )
-        ValDef(sym, rhs = Option('{ summonInline[Zero[a]].zero }.asTerm))
+        ValDef(sym, rhs = None)
 
   final class Input(
       val tpe: TypeRepr,
       val expr: Term,
-      val local: ValDef
+      val name: String
   )
 
   trait TermTransform[F[_]]:
