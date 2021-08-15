@@ -27,7 +27,9 @@ object ConvertTestMacro:
 
   class InputInitConvert[C <: Quotes & scala.Singleton](override val qctx: C)
       extends Convert[C](qctx)
-      with ContextUtil[C](qctx):
+      with ContextUtil[C](qctx)
+      with TupleBuilder[C](qctx)
+      with TupleNBuilder[C](qctx):
     import qctx.reflect.*
     def convert[A: Type](nme: String, in: Term): Converted =
       nme match

@@ -20,7 +20,7 @@ trait Cont:
      * intended to be used in conjunction with another macro that conditions the inputs.
      */
     def contMapN[A: Type, Effect[_]: Type](
-        i: MonadInstance with Singleton
+        i: MonadInstance with Singleton,
     )(
         tree: Expr[A],
         inner: conv.TermTransform[Effect]
@@ -111,6 +111,7 @@ trait Cont:
       def makeApp(body: Term): Expr[i.F[Effect[A]]] = inputs match
         case Nil      => pure(body)
         case x :: Nil => genMap(body, x)
+        case xs       => genMapN(body, xs)
 
       // no inputs, so construct F[A] via Instance.pure or pure+flatten
       def pure(body: Term): Expr[i.F[Effect[A]]] =
@@ -137,7 +138,7 @@ trait Cont:
         }
 
       def genMap(body: Term, input: Input): Expr[i.F[Effect[A]]] =
-        def genMap0[A1: Type](body: Expr[A1], input: Input): Expr[i.F[A1]] =
+        def genMap0[A1: Type](body: Expr[A1]): Expr[i.F[A1]] =
           input.tpe.asType match
             case '[a] =>
               val tpe =
@@ -169,15 +170,52 @@ trait Cont:
               ).asExprOf[i.F[A1]]
         eitherTree match
           case Left(_) =>
-            genMap0[Effect[A]](body.asExprOf[Effect[A]], input)
+            genMap0[Effect[A]](body.asExprOf[Effect[A]])
           case Right(_) =>
-            flatten(genMap0[i.F[Effect[A]]](body.asExprOf[i.F[Effect[A]]], input))
+            flatten(genMap0[i.F[Effect[A]]](body.asExprOf[i.F[Effect[A]]]))
+
+      def genMapN(body: Term, inputs: List[Input]): Expr[i.F[Effect[A]]] =
+        def genMapN0[A1: Type](body: Expr[A1]): Expr[i.F[A1]] =
+          val br = makeTuple(inputs)
+          val tpe =
+            MethodType(inputs.map(_.name))(_ => inputs.map(_.tpe), _ => TypeRepr.of[A1])
+          val lambda = Lambda(
+            owner = Symbol.spliceOwner,
+            tpe = tpe,
+            rhsFn = (sym, params) => {
+              // Called when transforming the tree to add an input.
+              //  For `qual` of type F[A], and a `selection` qual.value,
+              //  the call is addType(Type A, Tree qual)
+              // The result is a Tree representing a reference to
+              //  the bound value of the input.
+              def substitute(name: String, tpe: TypeRepr, qual: Term, replace: Term) =
+                convert[A](name, qual) transform { (tree: Term) =>
+                  // typed[a](Ref(param.symbol))
+                  val idx = inputs.indexWhere(input => input.expr == qual)
+                  val input = inputs(idx)
+                  Ref(params(idx).symbol)
+                }
+              transformWrappers(body.asTerm, substitute)
+            }
+          )
+
+          Select
+            .unique(instance.asTerm, "mapN")
+            .appliedToTypes(List(br.representationC, TypeRepr.of[A1]))
+            .appliedToArgs(List(br.tupleTerm, lambda))
+            .asExprOf[i.F[A1]]
+
+        eitherTree match
+          case Left(_) =>
+            genMapN0[Effect[A]](body.asExprOf[Effect[A]])
+          case Right(_) =>
+            flatten(genMapN0[i.F[Effect[A]]](body.asExprOf[i.F[Effect[A]]]))
 
       // Called when transforming the tree to add an input.
       //  For `qual` of type F[A], and a `selection` qual.value.
       def record(name: String, tpe: TypeRepr, qual: Term, replace: Term) =
         convert[A](name, qual) transform { (tree: Term) =>
-          inputs = Input(tpe, qual, freshName("q")) :: inputs
+          inputs = inputs.appended(Input(tpe, qual, freshName("q")))
           replace
         }
       val tx = transformWrappers(expr.asTerm, record)
