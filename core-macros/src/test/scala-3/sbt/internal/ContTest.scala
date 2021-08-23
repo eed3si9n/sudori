@@ -13,6 +13,7 @@ object ContTest extends BasicTestSuite:
     assert(contMapNMacro[Int](ContTest.wrapInit(List(1)) + 2).toString == "List(3)")
   }
 
+  /*
   test("getMapN") {
     assert(
       contMapNMacro[Int](
@@ -21,6 +22,7 @@ object ContTest extends BasicTestSuite:
       ).toString == "List(3)"
     )
   }
+   */
 
   // This compiles away
   def wrapInit[A](a: List[A]): A = ???
