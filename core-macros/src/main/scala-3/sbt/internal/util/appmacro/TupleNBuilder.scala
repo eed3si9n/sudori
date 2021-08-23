@@ -9,25 +9,8 @@ trait TupleNBuilder[C <: Quotes & scala.Singleton](override val qctx: C) extends
 
   override def makeTuple(inputs: List[Input]): BuilderResult =
     new BuilderResult {
-      override def representationC: TypeLambda =
-        TypeLambda(
-          paramNames = List("F1"),
-          boundsFn = _ =>
-            List(
-              TypeBounds.upper(
-                TypeLambda(
-                  paramNames = List("a"),
-                  boundsFn = _ => List(TypeBounds.empty),
-                  bodyFn = _ => TypeRepr.of[Any],
-                )
-              )
-            ),
-          bodyFn = (tl: TypeLambda) =>
-            val F1: TypeRepr = tl.param(0)
-            val tupleTypeArgs = inputs.map(in => F1.appliedTo(in.tpe))
-            tupleType(tupleTypeArgs)
-        )
-
+      override def representationC: TypeRepr =
+        tupleType(inputs.map(_.tpe))
       override def tupleTerm: Term =
         mkTuple(inputs.map(in => in.expr))
     }

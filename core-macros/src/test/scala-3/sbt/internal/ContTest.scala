@@ -13,16 +13,13 @@ object ContTest extends BasicTestSuite:
     assert(contMapNMacro[Int](ContTest.wrapInit(List(1)) + 2).toString == "List(3)")
   }
 
-  /*
   test("getMapN") {
-    assert(
-      contMapNMacro[Int](
-        ContTest.wrapInit(List(1))
-          + ContTest.wrapInit(List(2)) + 3
-      ).toString == "List(3)"
+    val actual = contMapNMacro[Int](
+      ContTest.wrapInit(List(1))
+        + ContTest.wrapInit(List(2)) + 3
     )
+    assert(actual == List(6))
   }
-   */
 
   // This compiles away
   def wrapInit[A](a: List[A]): A = ???

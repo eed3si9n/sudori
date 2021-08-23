@@ -178,11 +178,20 @@ trait Cont:
         def genMapN0[A1: Type](body: Expr[A1]): Expr[i.F[A1]] =
           val br = makeTuple(inputs)
           val tpe =
-            MethodType(inputs.map(_.name))(_ => inputs.map(_.tpe), _ => TypeRepr.of[A1])
+            MethodType(List("$p0"))(_ => List(br.representationC), _ => TypeRepr.of[A1])
           val lambda = Lambda(
             owner = Symbol.spliceOwner,
             tpe = tpe,
             rhsFn = (sym, params) => {
+              val p0 = params.head.asInstanceOf[Term]
+              val bindings = inputs.zipWithIndex map { case (input, idx) =>
+                val rhs =
+                  Select
+                    .unique(p0, "apply")
+                    .appliedToTypes(List(br.representationC))
+                    .appliedToArgs(List(Literal(IntConstant(idx))))
+                freshValDef(sym, input.tpe, rhs)
+              }
               // Called when transforming the tree to add an input.
               //  For `qual` of type F[A], and a `selection` qual.value,
               //  the call is addType(Type A, Tree qual)
@@ -190,20 +199,24 @@ trait Cont:
               //  the bound value of the input.
               def substitute(name: String, tpe: TypeRepr, qual: Term, replace: Term) =
                 convert[A](name, qual) transform { (tree: Term) =>
-                  // typed[a](Ref(param.symbol))
                   val idx = inputs.indexWhere(input => input.expr == qual)
-                  val input = inputs(idx)
-                  Ref(params(idx).symbol)
+                  Ref(bindings(idx).symbol)
                 }
-              transformWrappers(body.asTerm, substitute)
+              Block(
+                // this contains var $q1 = ...
+                bindings,
+                transformWrappers(body.asTerm, substitute)
+              )
             }
           )
-
-          Select
-            .unique(instance.asTerm, "mapN")
-            .appliedToTypes(List(br.representationC, TypeRepr.of[A1]))
-            .appliedToArgs(List(br.tupleTerm, lambda))
-            .asExprOf[i.F[A1]]
+          TypeRepr.of[Tuple.Map].appliedTo(List(br.representationC, TypeRepr.of[i.F])).asType match
+            case '[tupleMap] =>
+              val tuple = Typed(br.tupleTerm, TypeTree.of[tupleMap])
+              Select
+                .unique(instance.asTerm, "mapN")
+                .appliedToTypes(List(br.representationC, TypeRepr.of[A1]))
+                .appliedToArgs(List(tuple, lambda))
+                .asExprOf[i.F[A1]]
 
         eitherTree match
           case Left(_) =>

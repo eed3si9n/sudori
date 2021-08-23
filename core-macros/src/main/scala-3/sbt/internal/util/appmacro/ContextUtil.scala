@@ -42,7 +42,7 @@ trait ContextUtil[C <: Quotes & scala.Singleton](val qctx: C):
    * Constructs a new, synthetic, local var with type `tpe`, a unique name, initialized to
    * zero-equivalent (Zero[A]), and owned by `parent`.
    */
-  def freshValDef(parent: Symbol, tpe: TypeRepr): ValDef =
+  def freshValDef(parent: Symbol, tpe: TypeRepr, rhs: Term): ValDef =
     tpe.asType match
       case '[a] =>
         val sym =
@@ -50,10 +50,10 @@ trait ContextUtil[C <: Quotes & scala.Singleton](val qctx: C):
             parent,
             freshName("q"),
             tpe,
-            Flags.Mutable | Flags.Synthetic,
+            Flags.Synthetic,
             Symbol.noSymbol
           )
-        ValDef(sym, rhs = None)
+        ValDef(sym, rhs = Some(rhs))
 
   def typed[A: Type](value: Term): Term =
     Typed(value, TypeTree.of[A])

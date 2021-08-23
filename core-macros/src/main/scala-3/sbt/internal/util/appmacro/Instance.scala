@@ -11,7 +11,7 @@ import sbt.internal.util.Types.Id
 trait Instance:
   type F[x]
 
-  def mapN[K[L[a]]: AList, A2](in: K[F], f: K[Id] => A2): F[A2]
+  def mapN[Tup <: Tuple, A2](in: Tuple.Map[Tup, F], f: Tup => A2): F[A2]
   def map[A1, A2](in: F[A1], f: A1 => A2): F[A2]
   def pure[A](in: () => A): F[A]
 end Instance
