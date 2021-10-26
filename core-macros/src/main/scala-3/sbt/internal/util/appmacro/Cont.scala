@@ -3,6 +3,7 @@ package internal
 package util
 package appmacro
 
+import scala.collection.mutable.ListBuffer
 import scala.reflect.TypeTest
 import scala.quoted.*
 import Classes.Applicative
@@ -106,9 +107,9 @@ trait Cont:
 
       // we can extract i out of i.type
       val instance = extractSingleton[i.type]
-      var inputs = List[Input]()
+      val inputBuf = ListBuffer[Input]()
 
-      def makeApp(body: Term): Expr[i.F[Effect[A]]] = inputs match
+      def makeApp(body: Term, inputs: List[Input]): Expr[i.F[Effect[A]]] = inputs match
         case Nil      => pure(body)
         case x :: Nil => genMap(body, x)
         case xs       => genMapN(body, xs)
@@ -228,10 +229,10 @@ trait Cont:
       //  For `qual` of type F[A], and a `selection` qual.value.
       def record(name: String, tpe: TypeRepr, qual: Term, replace: Term) =
         convert[A](name, qual) transform { (tree: Term) =>
-          inputs = inputs.appended(Input(tpe, qual, freshName("q")))
+          inputBuf += Input(tpe, qual, freshName("q"))
           replace
         }
       val tx = transformWrappers(expr.asTerm, record)
-      val tr = makeApp(inner(tx))
+      val tr = makeApp(inner(tx), inputBuf.toList)
       tr
 end Cont
