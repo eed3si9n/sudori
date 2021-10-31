@@ -9,8 +9,8 @@ trait TupleNBuilder[C <: Quotes & scala.Singleton](override val qctx: C) extends
 
   override def makeTuple(inputs: List[Input]): BuilderResult =
     new BuilderResult {
-      override def representationC: TypeRepr =
-        tupleType(inputs.map(_.tpe))
+      override def inputTupleTypeRepr: TypeRepr =
+        tupleTypeRepr(inputs.map(_.tpe))
       override def tupleTerm: Term =
         mkTuple(inputs.map(in => in.expr))
     }

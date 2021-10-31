@@ -31,7 +31,7 @@ trait TupleBuilder[C <: Quotes & scala.Singleton](val qctx: C):
   def makeTuple(inputs: List[Input]): BuilderResult
 
   trait BuilderResult:
-    def representationC: TypeRepr
+    def inputTupleTypeRepr: TypeRepr
     def tupleTerm: Term
   end BuilderResult
 end TupleBuilder

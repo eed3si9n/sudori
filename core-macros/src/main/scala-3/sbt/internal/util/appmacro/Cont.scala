@@ -178,45 +178,47 @@ trait Cont:
       def genMapN(body: Term, inputs: List[Input]): Expr[i.F[Effect[A]]] =
         def genMapN0[A1: Type](body: Expr[A1]): Expr[i.F[A1]] =
           val br = makeTuple(inputs)
-          val tpe =
-            MethodType(List("$p0"))(_ => List(br.representationC), _ => TypeRepr.of[A1])
-          val lambda = Lambda(
-            owner = Symbol.spliceOwner,
-            tpe = tpe,
-            rhsFn = (sym, params) => {
-              val p0 = params.head.asInstanceOf[Term]
-              val bindings = inputs.zipWithIndex map { case (input, idx) =>
-                val rhs =
-                  Select
-                    .unique(p0, "apply")
-                    .appliedToTypes(List(br.representationC))
-                    .appliedToArgs(List(Literal(IntConstant(idx))))
-                freshValDef(sym, input.tpe, rhs)
-              }
-              // Called when transforming the tree to add an input.
-              //  For `qual` of type F[A], and a `selection` qual.value,
-              //  the call is addType(Type A, Tree qual)
-              // The result is a Tree representing a reference to
-              //  the bound value of the input.
-              def substitute(name: String, tpe: TypeRepr, qual: Term, replace: Term) =
-                convert[A](name, qual) transform { (tree: Term) =>
-                  val idx = inputs.indexWhere(input => input.expr == qual)
-                  Ref(bindings(idx).symbol)
-                }
-              Block(
-                // this contains var $q1 = ...
-                bindings,
-                transformWrappers(body.asTerm, substitute)
-              )
-            }
-          )
-          TypeRepr.of[Tuple.Map].appliedTo(List(br.representationC, TypeRepr.of[i.F])).asType match
+          val lambdaTpe =
+            MethodType(List("$p0"))(_ => List(br.inputTupleTypeRepr), _ => TypeRepr.of[A1])
+          val tupleMapRepr = TypeRepr
+            .of[Tuple.Map]
+            .appliedTo(List(br.inputTupleTypeRepr, TypeRepr.of[i.F]))
+          tupleMapRepr.asType match
             case '[tupleMap] =>
-              val tuple = Typed(br.tupleTerm, TypeTree.of[tupleMap])
+              val lambda = Lambda(
+                owner = Symbol.spliceOwner,
+                tpe = lambdaTpe,
+                rhsFn = (sym, params) => {
+                  val p0 = params.head.asInstanceOf[Term]
+                  val bindings = inputs.zipWithIndex map { case (input, idx) =>
+                    val rhs =
+                      Select
+                        .unique(p0, "apply")
+                        .appliedToTypes(List(br.inputTupleTypeRepr))
+                        .appliedToArgs(List(Literal(IntConstant(idx))))
+                    freshValDef(sym, input.tpe, rhs)
+                  }
+                  // Called when transforming the tree to add an input.
+                  //  For `qual` of type F[A], and a `selection` qual.value,
+                  //  the call is addType(Type A, Tree qual)
+                  // The result is a Tree representing a reference to
+                  //  the bound value of the input.
+                  def substitute(name: String, tpe: TypeRepr, qual: Term, replace: Term) =
+                    convert[A](name, qual) transform { (tree: Term) =>
+                      val idx = inputs.indexWhere(input => input.expr == qual)
+                      Ref(bindings(idx).symbol)
+                    }
+                  Block(
+                    // this contains var $q1 = ...
+                    bindings,
+                    transformWrappers(body.asTerm, substitute)
+                  )
+                }
+              )
               Select
                 .unique(instance.asTerm, "mapN")
-                .appliedToTypes(List(br.representationC, TypeRepr.of[A1]))
-                .appliedToArgs(List(tuple, lambda))
+                .appliedToTypes(List(br.inputTupleTypeRepr, TypeRepr.of[A1]))
+                .appliedToArgs(List(typed[tupleMap](br.tupleTerm), lambda))
                 .asExprOf[i.F[A1]]
 
         eitherTree match

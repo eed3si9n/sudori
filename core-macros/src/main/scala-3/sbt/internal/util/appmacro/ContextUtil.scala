@@ -58,9 +58,9 @@ trait ContextUtil[C <: Quotes & scala.Singleton](val qctx: C):
   def typed[A: Type](value: Term): Term =
     Typed(value, TypeTree.of[A])
 
-  def tupleType(param: List[TypeRepr]): TypeRepr =
+  def tupleTypeRepr(param: List[TypeRepr]): TypeRepr =
     param match
-      case x :: xs => TypeRepr.of[scala.*:].appliedTo(List(x, tupleType(xs)))
+      case x :: xs => TypeRepr.of[scala.*:].appliedTo(List(x, tupleTypeRepr(xs)))
       case Nil     => TypeRepr.of[EmptyTuple]
 
   def mkTuple(param: List[Term]): Term =
