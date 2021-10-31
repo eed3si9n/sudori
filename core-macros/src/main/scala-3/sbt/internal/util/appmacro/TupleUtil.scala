@@ -16,7 +16,15 @@ trait TupleUtil:
       f: [a] => F1[a] => F2[a]
   ): Tuple.Map[Tup, F2]
 
-  def traverse[F1[_], F2[_]: Applicative, P[_], Tup <: Tuple](
+  def traverse[F1[_], F2[_]: Applicative, Tup <: Tuple](
+      value: Tuple.Map[Tup, F1],
+      f: [a] => F1[a] => F2[a]
+  ): F2[Tup]
+
+  def mapN[F1[_]: Applicative, A, Tup <: Tuple](value: Tuple.Map[Tup, F1], f: Tup => A): F1[A] =
+    summon[Applicative[F1]].map(f, traverse[F1, F1, Tup](value, idPoly[F1]))
+
+  def traverseX[F1[_], F2[_]: Applicative, P[_], Tup <: Tuple](
       value: Tuple.Map[Tup, F1],
       f: [a] => F1[a] => F2[P[a]]
   ): F2[Tuple.Map[Tup, P]]
@@ -30,10 +38,6 @@ trait TupleUtil:
   def toList[F1[_], Tup <: Tuple](value: Tuple.Map[Tup, F1]): List[F1[Any]] =
     val f = [a] => (p1: F1[a], p2: List[F1[Any]]) => p1.asInstanceOf[F1[Any]] :: p2
     foldr[F1, List[F1[Any]], Tup](value, f, Nil)
-
-  def ap[F1[_]: Applicative, A, Tup <: Tuple](value: Tuple.Map[Tup, F1], f: Tup => A): F1[A] =
-    summon[Applicative[F1]]
-      .map(f, traverse[F1, F1, Id, Tup](value, idPoly[F1]).asInstanceOf[F1[Tup]])
 end TupleUtil
 
 object TupleUtil:
@@ -55,19 +59,30 @@ object TupleUtil:
           (f(head) *: transform[F1, F2, Tail[Tup]](tail.asInstanceOf, f))
             .asInstanceOf[Tuple.Map[Tup, F2]]
 
-    override def traverse[F1[_], F2[_]: Applicative, P[_], Tup <: Tuple](
+    override def traverse[F1[_], F2[_]: Applicative, Tup <: Tuple](
+        value: Tuple.Map[Tup, F1],
+        f: [a] => F1[a] => F2[a]
+    ): F2[Tup] =
+      val F2 = summon[Applicative[F2]]
+      value match
+        case _: Tuple.Map[EmptyTuple, F1] => F2.pure(nil[Tup])
+        case (head: F1[x] @unchecked) *: (tail: Tuple.Map[Tail[Tup], F1] @unchecked) =>
+          val tt = traverse[F1, F2, Tail[Tup]](tail, f)
+          val g = (t: Tail[Tup]) => (h: x) => (h *: t).asInstanceOf[Tup]
+          F2.apply[x, Tup](F2.map(g, tt), f(head))
+
+    override def traverseX[F1[_], F2[_]: Applicative, P[_], Tup <: Tuple](
         value: Tuple.Map[Tup, F1],
         f: [a] => F1[a] => F2[P[a]]
     ): F2[Tuple.Map[Tup, P]] =
       val F2 = summon[Applicative[F2]]
       value match
-        case (head: F1[x] @unchecked) *: tail =>
-          val tt: F2[Tuple.Map[Tail[Tup], P]] =
-            traverse[F1, F2, P, Tail[Tup]](tail.asInstanceOf[Tuple.Map[Tail[Tup], F1]], f)
+        case _: Tuple.Map[EmptyTuple, F1] => F2.pure(nil[Tuple.Map[Tup, P]])
+        case (head: F1[x] @unchecked) *: (tail: Tuple.Map[Tail[Tup], F1] @unchecked) =>
+          val tt = traverseX[F1, F2, P, Tail[Tup]](tail, f)
           val g = (t: Tuple.Map[Tail[Tup], P]) =>
             (h: P[x]) => (h *: t).asInstanceOf[Tuple.Map[Tup, P]]
           F2.apply[P[x], Tuple.Map[Tup, P]](F2.map(g, tt), f(head))
-        case _: Tuple.Map[EmptyTuple, F1] => F2.pure(nil[Tuple.Map[Tup, P]])
 
     override def foldr[F1[_], A, Tup <: Tuple](
         value: Tuple.Map[Tup, F1],

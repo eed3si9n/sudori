@@ -1,12 +1,30 @@
 package sbt.internal
 
+import scala.concurrent.Future
+import scala.concurrent.ExecutionContext.Implicits.*
+
 import sbt.internal.util.appmacro.*
 import verify.*
-import scala.concurrent.Future
+import TestObjects.futureApplicative
+import scala.concurrent.Await
+import scala.concurrent.duration.Duration
 
 object TupleUtilTest extends BasicTestSuite:
 
   val t1 = ((Option(1), Option("foo")))
+  def t2 = (
+    Future {
+      println("started 1")
+      Thread.sleep(100)
+      1
+    },
+    Future {
+      println("started 2")
+      Thread.sleep(100)
+      "foo"
+    },
+  )
+
   val tupleUtil = TupleUtil.tuple
 
   test("transform") {
@@ -17,8 +35,28 @@ object TupleUtilTest extends BasicTestSuite:
   }
 
   test("traverse") {
+    val f = [A] =>
+      (x: Option[A]) =>
+        x match
+          case Some(x: Int) => List(x + 1).asInstanceOf[List[A]]
+          case _            => List(x.get)
+    val actual = tupleUtil.traverse[Option, List, (Int, String)](t1, f)
+    assert(actual == List((2, "foo")))
+  }
+
+  test("mapN") {
+    val tuple = t2
+    val f = (arg: (Int, String)) => arg._1.toString + "|" + arg._2
+    val actual = tupleUtil.mapN[Future, String, (Int, String)](tuple, f)
+    val result = Await.result(actual, Duration.Inf)
+    assert(
+      result.toString == "1|foo"
+    )
+  }
+
+  test("traverseX") {
     val f = [A] => (x: Option[A]) => List(List(x.get))
-    val actual = tupleUtil.traverse[Option, List, List, (Int, String)](t1, f)
+    val actual = tupleUtil.traverseX[Option, List, List, (Int, String)](t1, f)
     Predef.assert(
       actual.toString == "List((List(1),List(foo)))",
       s"""
@@ -38,14 +76,6 @@ object TupleUtilTest extends BasicTestSuite:
     val actual = tupleUtil.toList[Option, (Int, String)](t1)
     assert(
       actual == List(Some(1), Some("foo"))
-    )
-  }
-
-  test("ap") {
-    val f = (arg: (Int, String)) => arg._1.toString + "|" + arg._2
-    val actual = tupleUtil.ap[Option, String, (Int, String)](t1, f)
-    assert(
-      actual == Some("1|foo")
     )
   }
 end TupleUtilTest
