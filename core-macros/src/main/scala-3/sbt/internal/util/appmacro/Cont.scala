@@ -161,7 +161,7 @@ trait Cont:
                   transformWrappers(body.asTerm, substitute)
                 }
               ).asExprOf[a => A1]
-              val expr = input.expr.asExprOf[i.F[a]]
+              val expr = input.term.asExprOf[i.F[a]]
               typed[i.F[A1]](
                 '{
                   val _i = $instance
@@ -205,7 +205,7 @@ trait Cont:
                   //  the bound value of the input.
                   def substitute(name: String, tpe: TypeRepr, qual: Term, replace: Term) =
                     convert[A](name, qual) transform { (tree: Term) =>
-                      val idx = inputs.indexWhere(input => input.expr == qual)
+                      val idx = inputs.indexWhere(input => input.term == qual)
                       Ref(bindings(idx).symbol)
                     }
                   Block(
@@ -218,7 +218,7 @@ trait Cont:
               Select
                 .unique(instance.asTerm, "mapN")
                 .appliedToTypes(List(br.inputTupleTypeRepr, TypeRepr.of[A1]))
-                .appliedToArgs(List(typed[tupleMap](br.tupleTerm), lambda))
+                .appliedToArgs(List(typed[tupleMap](br.tupleExpr.asTerm), lambda))
                 .asExprOf[i.F[A1]]
 
         eitherTree match

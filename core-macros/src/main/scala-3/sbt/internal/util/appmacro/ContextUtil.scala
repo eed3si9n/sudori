@@ -63,17 +63,9 @@ trait ContextUtil[C <: Quotes & scala.Singleton](val qctx: C):
       case x :: xs => TypeRepr.of[scala.*:].appliedTo(List(x, tupleTypeRepr(xs)))
       case Nil     => TypeRepr.of[EmptyTuple]
 
-  def mkTuple(param: List[Term]): Term =
-    param match
-      case x :: xs =>
-        Select
-          .unique('{ scala.runtime.Tuples }.asTerm, "cons")
-          .appliedToArgs(List(x, mkTuple(xs)))
-      case Nil => '{ EmptyTuple }.asTerm
-
   final class Input(
       val tpe: TypeRepr,
-      val expr: Term,
+      val term: Term,
       val name: String
   )
 

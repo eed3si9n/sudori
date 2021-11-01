@@ -11,7 +11,7 @@ trait TupleNBuilder[C <: Quotes & scala.Singleton](override val qctx: C) extends
     new BuilderResult {
       override def inputTupleTypeRepr: TypeRepr =
         tupleTypeRepr(inputs.map(_.tpe))
-      override def tupleTerm: Term =
-        mkTuple(inputs.map(in => in.expr))
+      override def tupleExpr: Expr[Tuple] =
+        Expr.ofTupleFromSeq(inputs.map(_.term.asExpr))
     }
 end TupleNBuilder
