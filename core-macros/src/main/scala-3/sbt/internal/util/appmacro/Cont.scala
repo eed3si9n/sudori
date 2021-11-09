@@ -190,14 +190,6 @@ trait Cont:
                 tpe = lambdaTpe,
                 rhsFn = (sym, params) => {
                   val p0 = params.head.asInstanceOf[Term]
-                  val bindings = inputs.zipWithIndex map { case (input, idx) =>
-                    val rhs =
-                      Select
-                        .unique(p0, "apply")
-                        .appliedToTypes(List(br.inputTupleTypeRepr))
-                        .appliedToArgs(List(Literal(IntConstant(idx))))
-                    freshValDef(sym, input.tpe, rhs)
-                  }
                   // Called when transforming the tree to add an input.
                   //  For `qual` of type F[A], and a `selection` qual.value,
                   //  the call is addType(Type A, Tree qual)
@@ -206,13 +198,12 @@ trait Cont:
                   def substitute(name: String, tpe: TypeRepr, qual: Term, replace: Term) =
                     convert[A](name, qual) transform { (tree: Term) =>
                       val idx = inputs.indexWhere(input => input.term == qual)
-                      Ref(bindings(idx).symbol)
+                      Select
+                        .unique(p0, "apply")
+                        .appliedToTypes(List(br.inputTupleTypeRepr))
+                        .appliedToArgs(List(Literal(IntConstant(idx))))
                     }
-                  Block(
-                    // this contains var $q1 = ...
-                    bindings,
-                    transformWrappers(body.asTerm, substitute)
-                  )
+                  transformWrappers(body.asTerm, substitute)
                 }
               )
               Select
