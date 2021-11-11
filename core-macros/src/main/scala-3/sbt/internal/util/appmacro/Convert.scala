@@ -31,7 +31,8 @@ trait Convert[C <: Quotes & Singleton](override val qctx: C)
    */
   def transformWrappers(
       tree: Term,
-      subWrapper: (String, TypeRepr, Term, Term) => Converted
+      subWrapper: (String, TypeRepr, Term, Term) => Converted,
+      owner: Symbol,
   ): Term =
     // the main tree transformer that replaces calls to InputWrapper.wrap(x) with
     //  plain Idents that reference the actual input value
@@ -50,7 +51,7 @@ trait Convert[C <: Quotes & Singleton](override val qctx: C)
           case _ =>
             super.transformTerm(tree)(owner)
     end appTransformer
-    appTransformer.transformTerm(tree)(Symbol.spliceOwner)
+    appTransformer.transformTerm(tree)(owner)
 
   object Converted:
     def success(tree: Term) = Converted.Success(tree, Types.idFun)

@@ -158,7 +158,7 @@ trait Cont:
                     convert[A](name, qual) transform { (tree: Term) =>
                       typed[a](Ref(param.symbol))
                     }
-                  transformWrappers(body.asTerm, substitute)
+                  transformWrappers(body.asTerm.changeOwner(sym), substitute, sym)
                 }
               ).asExprOf[a => A1]
               val expr = input.term.asExprOf[i.F[a]]
@@ -180,32 +180,32 @@ trait Cont:
           val br = makeTuple(inputs)
           val lambdaTpe =
             MethodType(List("$p0"))(_ => List(br.inputTupleTypeRepr), _ => TypeRepr.of[A1])
+          val lambda = Lambda(
+            owner = Symbol.spliceOwner,
+            tpe = lambdaTpe,
+            rhsFn = (sym, params) => {
+              val p0 = params.head.asInstanceOf[Term]
+              // Called when transforming the tree to add an input.
+              //  For `qual` of type F[A], and a `selection` qual.value,
+              //  the call is addType(Type A, Tree qual)
+              // The result is a Tree representing a reference to
+              //  the bound value of the input.
+              def substitute(name: String, tpe: TypeRepr, qual: Term, replace: Term) =
+                convert[A](name, qual) transform { (tree: Term) =>
+                  val idx = inputs.indexWhere(input => input.term == qual)
+                  Select
+                    .unique(Ref(p0.symbol), "apply")
+                    .appliedToTypes(List(br.inputTupleTypeRepr))
+                    .appliedToArgs(List(Literal(IntConstant(idx))))
+                }
+              transformWrappers(body.asTerm.changeOwner(sym), substitute, sym)
+            }
+          )
           val tupleMapRepr = TypeRepr
             .of[Tuple.Map]
             .appliedTo(List(br.inputTupleTypeRepr, TypeRepr.of[i.F]))
           tupleMapRepr.asType match
             case '[tupleMap] =>
-              val lambda = Lambda(
-                owner = Symbol.spliceOwner,
-                tpe = lambdaTpe,
-                rhsFn = (sym, params) => {
-                  val p0 = params.head.asInstanceOf[Term]
-                  // Called when transforming the tree to add an input.
-                  //  For `qual` of type F[A], and a `selection` qual.value,
-                  //  the call is addType(Type A, Tree qual)
-                  // The result is a Tree representing a reference to
-                  //  the bound value of the input.
-                  def substitute(name: String, tpe: TypeRepr, qual: Term, replace: Term) =
-                    convert[A](name, qual) transform { (tree: Term) =>
-                      val idx = inputs.indexWhere(input => input.term == qual)
-                      Select
-                        .unique(p0, "apply")
-                        .appliedToTypes(List(br.inputTupleTypeRepr))
-                        .appliedToArgs(List(Literal(IntConstant(idx))))
-                    }
-                  transformWrappers(body.asTerm, substitute)
-                }
-              )
               Select
                 .unique(instance.asTerm, "mapN")
                 .appliedToTypes(List(br.inputTupleTypeRepr, TypeRepr.of[A1]))
@@ -225,7 +225,7 @@ trait Cont:
           inputBuf += Input(tpe, qual, freshName("q"))
           replace
         }
-      val tx = transformWrappers(expr.asTerm, record)
+      val tx = transformWrappers(expr.asTerm, record, Symbol.spliceOwner)
       val tr = makeApp(inner(tx), inputBuf.toList)
       tr
 end Cont
